@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervisor Agent – Register</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glow { box-shadow: 0 0 30px rgba(139, 92, 246, 0.3); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center py-12">
+    <div class="max-w-md w-full mx-4">
+        <!-- Logo/Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-500/10 mb-4">
+                <i data-lucide="brain" class="w-8 h-8 text-violet-400" style="stroke-width: 1.5;"></i>
+            </div>
+            <h1 class="text-3xl font-light tracking-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-purple-400">
+                Supervisor Agent
+            </h1>
+            <p class="text-slate-400">Create Your Account</p>
+        </div>
+
+        <!-- Registration Form -->
+        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 backdrop-blur-sm">
+            <h2 class="text-xl font-semibold mb-6">Register</h2>
+            
+            <form id="register-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Username</label>
+                    <input type="text" id="username" name="username" required minlength="3"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                           placeholder="Choose a username (min 3 characters)">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Password</label>
+                    <input type="password" id="password" name="password" required minlength="6"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                           placeholder="Choose a password (min 6 characters)">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Confirm Password</label>
+                    <input type="password" id="confirm-password" name="confirm_password" required
+                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                           placeholder="Confirm your password">
+                </div>
+
+                <div id="error-message" class="hidden text-red-400 text-sm"></div>
+                <div id="success-message" class="hidden text-emerald-400 text-sm"></div>
+
+                <button type="submit" 
+                        class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl font-medium transition-all hover:scale-105 glow">
+                    <i data-lucide="user-plus" class="w-5 h-5" style="stroke-width: 1.5;"></i>
+                    Register
+                </button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <p class="text-slate-400 text-sm">
+                    Already have an account? 
+                    <a href="/login" class="text-violet-400 hover:text-violet-300 font-medium">Login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const API_BASE = window.location.origin;
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            // Clear previous messages
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+            
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin" style="stroke-width: 1.5;"></i> Registering...';
+            lucide.createIcons();
+            
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    successDiv.textContent = 'Registration successful! Redirecting...';
+                    successDiv.classList.remove('hidden');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1000);
+                } else {
+                    errorDiv.textContent = data.error || 'Registration failed';
+                    errorDiv.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i data-lucide="user-plus" class="w-5 h-5" style="stroke-width: 1.5;"></i> Register';
+                    lucide.createIcons();
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Please try again.';
+                errorDiv.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-lucide="user-plus" class="w-5 h-5" style="stroke-width: 1.5;"></i> Register';
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>
+

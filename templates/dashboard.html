@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervisor Agent – Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glow { box-shadow: 0 0 30px rgba(139, 92, 246, 0.3); }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                        <i data-lucide="brain" class="w-5 h-5 text-violet-400" style="stroke-width: 1.5;"></i>
+                    </div>
+                    <span class="text-lg font-semibold tracking-tight">Supervisor Agent</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-slate-400" id="username-display">{{ user.username }}</span>
+                    <button onclick="logout()" class="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4" style="stroke-width: 1.5;"></i>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <!-- Page Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl sm:text-6xl font-light tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-purple-400">
+                Supervisor Dashboard
+            </h1>
+            <p class="text-xl text-slate-400 max-w-2xl mx-auto">
+                Personalized Sleep Recommendations Based on Your Memory
+            </p>
+        </div>
+
+        <!-- User Info Card -->
+        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 mb-6 backdrop-blur-sm">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                        <i data-lucide="user" class="w-6 h-6 text-violet-400" style="stroke-width: 1.5;"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-semibold">{{ user.username }}</h2>
+                        <p class="text-slate-400 text-sm">User ID: {{ user.user_id }}</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <a href="http://localhost:8000?user_id={{ user.user_id }}" target="_blank" 
+                       class="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-medium transition-colors">
+                        <i data-lucide="external-link" class="w-4 h-4" style="stroke-width: 1.5;"></i>
+                        Worker Agent Interface
+                    </a>
+                    <button onclick="refreshRecommendations()" 
+                            class="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                        <i data-lucide="refresh-cw" class="w-4 h-4" style="stroke-width: 1.5;"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Worker Agent Status -->
+        <div id="worker-status" class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 mb-6 backdrop-blur-sm">
+            <div class="flex items-center gap-3">
+                <div id="worker-status-indicator" class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span class="text-slate-400">Checking worker agent status...</span>
+            </div>
+        </div>
+
+        <!-- Sleep Score Card -->
+        <div id="sleep-score-card" class="bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/20 rounded-2xl p-8 mb-6 backdrop-blur-sm hidden">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700 mb-4">
+                    <i data-lucide="activity" class="w-4 h-4 text-violet-400" style="stroke-width: 1.5;"></i>
+                    <span class="text-sm text-slate-400">Sleep Score</span>
+                </div>
+                <div id="sleep-score" class="text-7xl sm:text-8xl font-light tracking-tight mb-2 text-violet-300 glow">--</div>
+                <div id="confidence" class="text-slate-400 text-sm">Confidence: <span id="confidence-value">--</span>%</div>
+            </div>
+        </div>
+
+        <!-- Issues Card -->
+        <div id="issues-card" class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 mb-6 backdrop-blur-sm hidden">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                    <i data-lucide="alert-circle" class="w-6 h-6 text-yellow-400" style="stroke-width: 1.5;"></i>
+                </div>
+                <h2 class="text-2xl font-semibold">Issues Identified</h2>
+            </div>
+            <ul id="issues-list" class="space-y-3">
+                <!-- Issues will be inserted here -->
+            </ul>
+        </div>
+
+        <!-- Recommendations Card -->
+        <div id="recommendations-card" class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 mb-6 backdrop-blur-sm hidden">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                    <i data-lucide="lightbulb" class="w-6 h-6 text-emerald-400" style="stroke-width: 1.5;"></i>
+                </div>
+                <h2 class="text-2xl font-semibold">Recommendations</h2>
+            </div>
+            <div id="recommendations-content" class="space-y-4">
+                <!-- Recommendations will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Personalized Tips Card -->
+        <div id="tips-card" class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 mb-6 backdrop-blur-sm hidden">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                    <i data-lucide="sparkles" class="w-6 h-6 text-violet-400" style="stroke-width: 1.5;"></i>
+                </div>
+                <h2 class="text-2xl font-semibold">Personalized Tips</h2>
+            </div>
+            <ul id="tips-list" class="space-y-3">
+                <!-- Tips will be inserted here -->
+            </ul>
+        </div>
+
+        <!-- Memory Data Card -->
+        <div id="memory-card" class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 mb-6 backdrop-blur-sm hidden">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                    <i data-lucide="database" class="w-6 h-6 text-blue-400" style="stroke-width: 1.5;"></i>
+                </div>
+                <h2 class="text-2xl font-semibold">Memory Data</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-slate-300">Short-Term Memory (STM)</h3>
+                    <div id="stm-content" class="text-slate-400 text-sm">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-slate-300">Long-Term Memory (LTM)</h3>
+                    <div id="ltm-content" class="text-slate-400 text-sm">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- No Data Message -->
+        <div id="no-data-message" class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 backdrop-blur-sm text-center">
+            <div class="w-16 h-16 rounded-full bg-slate-800 mx-auto mb-4 flex items-center justify-center">
+                <i data-lucide="info" class="w-8 h-8 text-slate-400" style="stroke-width: 1.5;"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-2">No Recommendations Available</h3>
+            <p class="text-slate-400 mb-4">
+                Add sleep sessions via the Worker Agent interface to get personalized recommendations.
+            </p>
+            <a href="http://localhost:8000?user_id={{ user.user_id }}" target="_blank" 
+               class="inline-flex items-center gap-2 px-6 py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl font-medium transition-colors">
+                <i data-lucide="external-link" class="w-5 h-5" style="stroke-width: 1.5;"></i>
+                Go to Worker Agent Interface
+            </a>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const API_BASE = window.location.origin;
+        const userId = '{{ user.user_id }}';
+
+        // Check worker agent status
+        async function checkWorkerStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/worker/health`);
+                const data = await response.json();
+                
+                const indicator = document.getElementById('worker-status-indicator');
+                const statusDiv = document.getElementById('worker-status');
+                
+                if (response.ok && data.status === 'healthy') {
+                    indicator.className = 'w-3 h-3 rounded-full bg-emerald-500';
+                    statusDiv.querySelector('span').textContent = 'Worker agent is online and healthy';
+                } else {
+                    indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                    statusDiv.querySelector('span').textContent = 'Worker agent is unavailable';
+                }
+            } catch (error) {
+                const indicator = document.getElementById('worker-status-indicator');
+                const statusDiv = document.getElementById('worker-status');
+                indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                statusDiv.querySelector('span').textContent = 'Worker agent connection failed';
+            }
+        }
+
+        // Load recommendations
+        async function loadRecommendations() {
+            try {
+                const response = await fetch(`${API_BASE}/api/recommendations`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.available && (data.sleep_score !== null || data.recommendations || data.personalized_tips?.length > 0)) {
+                    displayRecommendations(data);
+                } else {
+                    showNoData();
+                }
+            } catch (error) {
+                console.error('Error loading recommendations:', error);
+                showNoData();
+            }
+        }
+
+        // Load memory
+        async function loadMemory() {
+            try {
+                const response = await fetch(`${API_BASE}/api/memory`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.memory) {
+                    displayMemory(data.memory);
+                }
+            } catch (error) {
+                console.error('Error loading memory:', error);
+            }
+        }
+
+        // Display recommendations
+        function displayRecommendations(data) {
+            document.getElementById('no-data-message').classList.add('hidden');
+            
+            // Sleep Score
+            if (data.sleep_score !== null && data.sleep_score !== undefined) {
+                document.getElementById('sleep-score').textContent = data.sleep_score || '--';
+                document.getElementById('confidence-value').textContent = 
+                    data.confidence ? (data.confidence * 100).toFixed(0) : '--';
+                document.getElementById('sleep-score-card').classList.remove('hidden');
+            }
+            
+            // Issues
+            if (data.issues && data.issues.length > 0) {
+                const issuesList = document.getElementById('issues-list');
+                issuesList.innerHTML = data.issues.map(issue => `
+                    <li class="flex items-start gap-3 text-slate-300">
+                        <i data-lucide="alert-circle" class="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" style="stroke-width: 1.5;"></i>
+                        <span>${typeof issue === 'string' ? issue : issue.description || JSON.stringify(issue)}</span>
+                    </li>
+                `).join('');
+                document.getElementById('issues-card').classList.remove('hidden');
+                lucide.createIcons();
+            }
+            
+            // Recommendations
+            const recs = data.recommendations || {};
+            if (Object.keys(recs).length > 0) {
+                const recommendationsContent = document.getElementById('recommendations-content');
+                recommendationsContent.innerHTML = `
+                    ${recs.ideal_sleep_window ? `
+                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                        <div class="flex items-center gap-2 text-slate-400 text-sm mb-2">
+                            <i data-lucide="moon" class="w-4 h-4" style="stroke-width: 1.5;"></i>
+                            <span>Ideal Sleep Window</span>
+                        </div>
+                        <div class="text-lg font-semibold text-slate-100">
+                            ${recs.ideal_sleep_window.recommended_bedtime || '--:--'} - ${recs.ideal_sleep_window.recommended_waketime || '--:--'}
+                        </div>
+                    </div>
+                    ` : ''}
+                    ${recs.caffeine_cutoff ? `
+                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                        <div class="flex items-center gap-2 text-slate-400 text-sm mb-2">
+                            <i data-lucide="coffee" class="w-4 h-4" style="stroke-width: 1.5;"></i>
+                            <span>Caffeine Cutoff</span>
+                        </div>
+                        <div class="text-sm text-slate-300">
+                            ${recs.caffeine_cutoff.recommendation || recs.caffeine_cutoff.cutoff_time || 'No recommendation'}
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+                document.getElementById('recommendations-card').classList.remove('hidden');
+                lucide.createIcons();
+            }
+            
+            // Personalized Tips
+            if (data.personalized_tips && data.personalized_tips.length > 0) {
+                const tipsList = document.getElementById('tips-list');
+                tipsList.innerHTML = data.personalized_tips.map(tip => `
+                    <li class="flex items-start gap-3 text-slate-300">
+                        <i data-lucide="check-circle" class="w-5 h-5 text-violet-400 mt-0.5 flex-shrink-0" style="stroke-width: 1.5;"></i>
+                        <span>${tip}</span>
+                    </li>
+                `).join('');
+                document.getElementById('tips-card').classList.remove('hidden');
+                lucide.createIcons();
+            }
+        }
+
+        // Display memory
+        function displayMemory(memory) {
+            const stm = memory.stm || {};
+            const ltm = memory.ltm || {};
+            
+            // STM
+            const stmContent = document.getElementById('stm-content');
+            if (stm.sessions && stm.sessions.length > 0) {
+                stmContent.innerHTML = `
+                    <p class="mb-2">Recent Sessions: ${stm.count || stm.sessions.length}</p>
+                    <div class="space-y-2">
+                        ${stm.sessions.slice(0, 3).map(session => `
+                            <div class="bg-slate-800/50 rounded-lg p-3 text-xs">
+                                <div>${session.session_date || 'N/A'}</div>
+                                <div class="text-slate-500">${session.duration_hours?.toFixed(1) || '--'}h</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                stmContent.innerHTML = '<p>No recent sessions</p>';
+            }
+            
+            // LTM
+            const ltmContent = document.getElementById('ltm-content');
+            const trends = ltm.trends || {};
+            const patterns = ltm.patterns || [];
+            
+            let ltmHtml = '';
+            if (Object.keys(trends).length > 0) {
+                ltmHtml += '<div class="mb-3"><strong>Trends:</strong><ul class="list-disc list-inside mt-1 space-y-1">';
+                for (const [key, value] of Object.entries(trends)) {
+                    ltmHtml += `<li>${key}: ${value}</li>`;
+                }
+                ltmHtml += '</ul></div>';
+            }
+            
+            if (patterns.length > 0) {
+                ltmHtml += '<div><strong>Patterns:</strong><ul class="list-disc list-inside mt-1 space-y-1">';
+                patterns.forEach(pattern => {
+                    ltmHtml += `<li>${typeof pattern === 'string' ? pattern : pattern.description || JSON.stringify(pattern)}</li>`;
+                });
+                ltmHtml += '</ul></div>';
+            }
+            
+            ltmContent.innerHTML = ltmHtml || '<p>No long-term data available</p>';
+            
+            document.getElementById('memory-card').classList.remove('hidden');
+        }
+
+        // Show no data message
+        function showNoData() {
+            document.getElementById('sleep-score-card').classList.add('hidden');
+            document.getElementById('issues-card').classList.add('hidden');
+            document.getElementById('recommendations-card').classList.add('hidden');
+            document.getElementById('tips-card').classList.add('hidden');
+            document.getElementById('no-data-message').classList.remove('hidden');
+        }
+
+        // Refresh recommendations
+        async function refreshRecommendations() {
+            const btn = event.target.closest('button');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin" style="stroke-width: 1.5;"></i> Refreshing...';
+            lucide.createIcons();
+            
+            await Promise.all([loadRecommendations(), loadMemory(), checkWorkerStatus()]);
+            
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            lucide.createIcons();
+        }
+
+        // Logout
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                window.location.href = '/login';
+            } catch (error) {
+                window.location.href = '/login';
+            }
+        }
+
+        // Initialize on load
+        (async () => {
+            await Promise.all([
+                checkWorkerStatus(),
+                loadRecommendations(),
+                loadMemory()
+            ]);
+        })();
+    </script>
+</body>
+</html>
+
