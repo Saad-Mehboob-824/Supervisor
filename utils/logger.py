@@ -11,20 +11,26 @@ def setup_logger():
     logger = logging.getLogger('supervisor_agent')
     logger.setLevel(getattr(logging, Config.LOG_LEVEL, logging.INFO))
     
-    # Create logs directory if it doesn't exist
-    log_dir = os.path.dirname(Config.LOG_FILE)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
-    
-    # File handler
+    # File handler (only if writable)
     if Config.LOG_FILE:
-        file_handler = logging.FileHandler(Config.LOG_FILE)
-        file_handler.setLevel(logging.DEBUG)
-        file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
+        try:
+            # Create logs directory if it doesn't exist
+            log_dir = os.path.dirname(Config.LOG_FILE)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+
+            file_handler = logging.FileHandler(Config.LOG_FILE)
+            file_handler.setLevel(logging.DEBUG)
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            file_handler.setFormatter(file_formatter)
+            logger.addHandler(file_handler)
+        except OSError:
+            # Fallback for read-only file systems (like Vercel)
+            pass
+        except Exception as e:
+            print(f"Failed to setup file logging: {e}")
     
     # Console handler
     console_handler = logging.StreamHandler()
