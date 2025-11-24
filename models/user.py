@@ -2,11 +2,11 @@
 User model and MongoDB storage for Supervisor Agent.
 """
 from datetime import datetime
-import uuid
 from typing import Optional, Dict, Any
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
+from bson.objectid import ObjectId
 from config import Config
 from utils.logger import logger
 
@@ -16,7 +16,7 @@ class User:
     def __init__(self, username: str, password: str = None, user_id: str = None, 
                  profile: Dict[str, Any] = None):
         self.username = username
-        self.user_id = user_id or f"U_{uuid.uuid4().hex[:8]}"
+        self.user_id = user_id  # Will be set to str(ObjectId) after save
         self.password_hash = generate_password_hash(password) if password else None
         self.profile = profile or {}
         self.created_at = None
@@ -45,9 +45,12 @@ class User:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'User':
         """Create user from dictionary."""
+        # Handle _id -> user_id mapping
+        user_id = str(data.get('_id')) if data.get('_id') else data.get('user_id')
+        
         user = cls(
             username=data['username'],
-            user_id=data.get('user_id'),
+            user_id=user_id,
             profile=data.get('profile', {})
         )
         user.password_hash = data.get('password_hash')
@@ -66,7 +69,6 @@ class MongoUserStorage:
             
             # Create indexes
             self.collection.create_index('username', unique=True)
-            self.collection.create_index('user_id', unique=True)
             self.collection.create_index('created_at')
             
             # Test connection
@@ -88,15 +90,22 @@ class MongoUserStorage:
             
             user_doc = {
                 'username': user.username,
-                'user_id': user.user_id,
                 'password_hash': user.password_hash,
                 'profile': user.profile,
                 'created_at': user.created_at,
                 'last_login': user.last_login
             }
             
-            # Try to insert
-            self.collection.insert_one(user_doc)
+            # If user already has an ID, use it
+            if user.user_id:
+                user_doc['_id'] = ObjectId(user.user_id)
+                # Update existing
+                self.collection.replace_one({'_id': ObjectId(user.user_id)}, user_doc, upsert=True)
+            else:
+                # Insert new
+                result = self.collection.insert_one(user_doc)
+                user.user_id = str(result.inserted_id)
+            
             logger.info(f'User saved: {user.username} ({user.user_id})')
             return True
             
@@ -119,9 +128,11 @@ class MongoUserStorage:
             return None
     
     def get_user_by_id(self, user_id: str) -> Optional[User]:
-        """Get user by user_id."""
+        """Get user by user_id (ObjectId)."""
         try:
-            user_doc = self.collection.find_one({'user_id': user_id})
+            if not user_id:
+                return None
+            user_doc = self.collection.find_one({'_id': ObjectId(user_id)})
             if user_doc:
                 return User.from_dict(user_doc)
             return None
@@ -140,8 +151,11 @@ class MongoUserStorage:
     def update_user(self, user: User) -> bool:
         """Update existing user."""
         try:
+            if not user.user_id:
+                return False
+                
             result = self.collection.update_one(
-                {'user_id': user.user_id},
+                {'_id': ObjectId(user.user_id)},
                 {'$set': {
                     'username': user.username,
                     'password_hash': user.password_hash,

@@ -35,7 +35,7 @@ class Config:
 
     # MongoDB configuration
     MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/')
-    MONGODB_DB_NAME = os.environ.get('MONGODB_DB_NAME', 'supervisor_db')
+    MONGODB_DB_NAME = os.environ.get('MONGODB_DB_NAME', 'supervisor')
     
     # Session configuration
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
